@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>山体</title>
+    <link href="https://cdn.jsdelivr.net/npm/video.js@7.10.2/dist/video-js.min.css" rel="stylesheet" />
+    <style type="text/css">
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+        #app{
+            position: relative;
+        }
+        #vdo{
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            /* display: none; */
+        }
+        .LoginBtn{
+            position: absolute;
+            bottom:50px;
+            left: 50%;
+            z-index: 9999999;
+            width: auto;
+            height: auto;
+            padding: 4px 15px;
+            border: 1px solid gray;
+            border-radius: 4px;
+            cursor: pointer;
+            transform: translate(-50%, 0px);
+        }
+       .videoBox{
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            left: 0;
+            top: 0;
+       }
+       .MessageBox{
+            position: absolute;
+            top: 350px;
+            right: -200px;
+            width:200px;
+            height: 250px;
+            background-color: rgb(68, 68, 68);
+            border-radius: 10px;
+            box-sizing: border-box;
+            padding: 30px 10px 10px;
+            opacity: 0.5;
+       }
+       .MessageBox > .Tips{
+            position: absolute;
+            left: 10px;
+            top:10px;
+            color: #fff;
+            font-size: 14px;
+            text-align: left;
+       }
+         .MessageBox-Info{
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            border-radius: 5px;
+            box-sizing: border-box;
+         }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="MessageBox">
+            <div class="Tips">相关信息</div>
+            <div class="MessageBox-Info">
+                {{ShowMessageInfo}}
+            </div>
+        </div>
+    </div>
+    <div id="vdo">
+        <button onclick="unshow()" type="button" class="LoginBtn">登录</button>
+        <div class="videoBox">
+            <video id="example_video" class="video-js vjs-default-skin vjs-big-play-centered" muted autoplay  preload="none" loop width="100%" height="100%" style="width: 100%;height:100%"
+            data-setup="{}">
+               <source src="./src/img/donghua/Scene1.mp4" type="video/mp4">
+           </video>
+        </div>
+    </div>
+</body>
+<script src="./build/vue.min.js"></script>
+<script src="./build/jquery-3.5.1.min.js"></script>
+<script src="./build/video.min.js"></script>
+<script src="./build/three.js"></script>
+<script src="./build/OrbitControls.js"></script>
+<script src="./build/dat.gui.min.js"></script>
+<script src="./build/GLTFLoader.js"></script>
+
+<script src="index.js"></script>
+
+<!-- 外发光 -->
+<script src="./build/library/EffectComposer.js"></script>
+<script src="./build/library/RenderPass.js"></script>
+<script src="./build/library/GammaCorrectionShader.js"></script>
+<script src="./build/library/ShaderPass.js"></script>
+<script src="./build/library/CopyShader.js"></script>
+<script src="./build/library/LuminosityHighPassShader.js"></script>
+<script src="./build/library/UnrealBloomPass.js"></script>
+
+<script>
+    let options = {};
+    let PlayerItem 
+    videojs("example_video").ready(function(){
+        PlayerItem = this;
+        this.play(); // 自动播放
+    });
+    var renderer, camera, scene, gui, light, controls,object,mouse,flag=false;
+    var renderScene,composer,bloomPass;
+
+    var params = {
+            exposure: 1,
+            bloomStrength: 0.7,
+            bloomThreshold: 0,
+            bloomRadius: 0.6
+        };
+
+    path_all_01=[
+                './src/model/ts/ts_test.gltf',
+                './src/model/ss/ss_test01.gltf',
+                './src/model/hs/hs_test.gltf',
+                './src/model/hns/hns_test.gltf',
+                ];
+    path_all_02=[
+                './src/model/ts/ts_test.gltf',
+                './src/model/ss/ss_test02.gltf',
+                './src/model/hs/hs_test.gltf',
+                './src/model/hns/hns_test.gltf',
+                ];
+    model_path='./src/model/ss/ss_test01.gltf';//默认山体
+                
+
+    function initScene() {
+        // 渲染器
+        renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        // 场景
+        scene = new THREE.Scene();
+        // scene.background = new THREE.Color(0x4444444);
+
+        // 相机
+        camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera.position.set(-400, 320, -500 );
+        scene.add( camera );
+
+        // 控制器
+        controls = new THREE.OrbitControls( camera, renderer.domElement );
+		controls.maxPolarAngle = Math.PI * 0.5;
+		controls.minDistance = 1;
+		controls.maxDistance = 2000;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+        controls.enablePan = true;
+
+        // 灯
+        var mAmbientLight = new THREE.AmbientLight(0xffffff);
+        mAmbientLight.intensity = 0.45;
+        mAmbientLight.position.set(0, 0, 800);
+        scene.add(mAmbientLight);
+
+		pointLight1 = new THREE.PointLight( 0xffffff, 1 );
+		camera.add( pointLight1 );
+		pointLight2 = new THREE.PointLight( 0xffffff, 1 );
+        scene.add(pointLight2)
+        // 外发光
+        renderScene = new THREE.RenderPass( scene, camera );
+        bloomPass = new THREE.UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+        bloomPass.threshold = params.bloomThreshold;
+        bloomPass.strength = params.bloomStrength;
+        bloomPass.radius = params.bloomRadius;
+
+        composer = new THREE.EffectComposer( renderer );
+        // let effectColorSpaceConversion = new THREE.ShaderPass(new THREE.GammaCorrectionShader  );
+        // composer.addPass( effectColorSpaceConversion );
+        // composer.readBuffer.texture.encoding = THREE.sRGBEncoding;
+        // composer.writeBuffer.texture.encoding = THREE.sRGBEncoding;
+        composer.addPass( renderScene );
+        composer.addPass( bloomPass );
+    }
+
+   //初始化dat.GUI简化试验流程
+   var gui;
+    function initGui() {
+        //声明一个保存需求修改的相关数据的对象
+        gui = {
+            mountainX:180, 
+            mountainY:0.5, 
+            mountainZ:120, 
+            mountainScale:0.15, 
+
+        //泰山01
+        createTs_01: function () {
+            model_path = path_all_01[0];
+            scene.remove(object);
+            initModel();
+        },
+        //嵩山01
+        createSs_01: function () {
+            model_path = path_all_01[1];
+            scene.remove(object);
+            initModel();
+        },
+        //恒山01
+        createHns_01: function () {
+            model_path = path_all_01[2];
+            scene.remove(object);
+            initModel();
+        },
+        //衡山01
+        createHs_01: function () {
+            model_path = path_all_01[3];
+            scene.remove(object);
+            initModel();
+        },
+
+        //泰山02
+        createTs_02: function () {
+            model_path = path_all_02[0];
+            scene.remove(object);
+            initModel();
+        },
+        //嵩山02
+        createSs_02: function () {
+            model_path = path_all_02[1];
+            scene.remove(object);
+            initModel();
+        },
+        //恒山02
+        createHns_02: function () {
+            model_path = path_all_02[2];
+            scene.remove(object);
+            initModel();
+        },
+        //衡山02
+        createHs_02: function () {
+            model_path = path_all_02[3];
+            scene.remove(object);
+            initModel();
+        },
+        
+        };
+        var datGui = new dat.GUI();
+        //将设置属性添加到gui当中，gui.add(对象，属性，最小值，最大值）
+
+        
+        //山体材质01的操作
+        var objectFolder = datGui.addFolder("山体材质01");
+        objectFolder.add(gui,"mountainX",-250,250).onChange(function (e) {
+            object.position.x = e;
+        });
+        objectFolder.add(gui,"mountainY",0,50).onChange(function (e) {
+            object.position.y = e;
+        });
+        objectFolder.add(gui,"mountainZ",-250,250).onChange(function (e) {
+            object.position.z = e;
+        });
+        objectFolder.add(gui,"mountainScale",0.01,1).onChange(function (e) {
+            object.scale.set(e, e, e);
+        });
+        objectFolder.add(gui, "createTs_01");
+        objectFolder.add(gui, "createSs_01");
+        objectFolder.add(gui, "createHns_01");
+        objectFolder.add(gui, "createHs_01");
+        
+        //山体材质02的操作
+        var objectFolder = datGui.addFolder("山体材质02");
+      
+        objectFolder.add(gui, "createTs_02");
+        objectFolder.add(gui, "createSs_02");
+        objectFolder.add(gui, "createHns_02");
+        objectFolder.add(gui, "createHs_02");
+        
+    }
+
+
+    function initModel() {
+        var loader = new THREE.GLTFLoader();
+        loader.load(model_path, function (gltf) {
+        object = gltf.scene;
+        //场景中添加模型文件
+        scene.add(object);
+        //设置整体场景的比例
+        object.scale.set(1.5, 1.5, 1.5); 
+        object.position.set(0,0,0);
+        });
+    }
+ 
+
+    //窗口变动触发的函数
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+    }
+//
+    function animate() {
+        renderer.render(scene, camera);
+        composer.render();
+        requestAnimationFrame(animate);
+    }
+
+        
+        render();
+        function render() {
+        initGui();
+        initScene();
+        initModel();
+        animate();
+        window.onresize = onWindowResize;
+}
+window.addEventListener('mousedown', mouseDown, false);
+window.addEventListener('mousemove', mouseMove, false);
+window.addEventListener('mouseup', mouseUp, false);
+    
+     function mouseDown(e,mouseX,mouseY){
+        if(document.getElementById('vdo').style.display==='none')
+            if(getIntersects(e).length>0)
+                {   //点击触发
+                    let name = object.children[0].name;
+                    SwitchInfos(name)
+                    slideOut()
+                    // wireframe();
+                }else{
+                    slideIn()
+                }
+     }
+     function mouseMove(e,mouseX,mouseY){
+        if(document.getElementById('vdo').style.display==='none')
+            if(getIntersects(e).length>0)
+                {
+                    //为模型添加外发光
+                    bloomPass.strength = 0.7;
+                }else{
+                    // 停止外发光
+                    bloomPass.strength = 0.4;
+                }
+     }
+     function mouseUp(e,mouseX,mouseY){
+        if(document.getElementById('vdo').style.display==='none')
+            if(getIntersects(e).length>0)
+                {   
+                    wireframe();
+                }
+     }
+     // 获取与射线相交的对象数组
+function getIntersects(event) {
+    event.preventDefault();
+
+    // 声明 raycaster 和 mouse 变量
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+
+    // 通过鼠标点击位置,计算出 raycaster 所需点的位置,以屏幕为中心点,范围 -1 到 1
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    //通过鼠标点击的位置(二维坐标)和当前相机的矩阵计算出射线位置
+    raycaster.setFromCamera(mouse, camera);
+
+    // 获取与raycaster射线相交的数组集合，其中的元素按照距离排序，越近的越靠前
+    var intersects = raycaster.intersectObject(object,true);
+    //返回选中的对象数组
+    return intersects;
+}
+ 
+        //网格
+function wireframe() {
+    flag=!flag;
+    if(flag){
+        object.traverse(function (gltf) {
+            if (gltf.isMesh) {
+                gltf.material.wireframe = true;
+            //设置mesh的一些属性
+            }
+            })
+        }else{
+            object.traverse(function (gltf) {
+            if (gltf.isMesh) {
+                gltf.material.wireframe = false;
+            //设置mesh的一些属性
+            }
+            })
+        }
+}
+
+function unshow (){
+    document.getElementById('vdo').style.display='none';
+    PlayerItem.pause();
+}
+</script>
+</html>
